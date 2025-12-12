@@ -39,10 +39,11 @@ artifacts/
 # ASP.NET Core
 appsettings.Development.json
 appsettings.Local.json
-appsettings.*.json
+appsettings.Production.json
+# KHÔNG ignore appsettings.*.json để giữ file config chính
 
-# EF Core Migrations snapshot
-*MigrationsSnapshot.cs
+# EF Core Migration snapshot (CẦN COMMIT)
+# *MigrationsSnapshot.cs  <-- xoá dòng này
 
 # NPM / Yarn (if using frontend inside solution)
 node_modules/
@@ -78,4 +79,4 @@ ehthumbs.db
 # Docker
 docker-compose.override.yml
 docker-compose.*.yml
-*.dockerfile
+# *.dockerfile <-- optional, không cần ignore
