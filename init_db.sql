@@ -21,8 +21,9 @@ CREATE TABLE users (
 );
 
 -- Index để tăng tốc login & check email tồn tại
-CREATE INDEX idx_users_normalized_email 
-  ON users(normalized_email);
+CREATE UNIQUE INDEX uq_users_normalized_email
+ON users(normalized_email);
+
 
 
 -- ============================================
@@ -37,7 +38,9 @@ CREATE TABLE refresh_tokens (
   revoked_at timestamptz
 );
 
-CREATE INDEX idx_refresh_user ON refresh_tokens(user_id);
+CREATE UNIQUE INDEX uq_refresh_tokens_token
+ON refresh_tokens(token);
+ 
 
 
 -- ============================================
@@ -83,6 +86,7 @@ CREATE TABLE stories (
 CREATE INDEX idx_stories_author ON stories(author_id);
 CREATE INDEX idx_stories_category ON stories(category_id);
 CREATE INDEX idx_stories_search ON stories USING GIN(search_vector);
+CREATE TYPE story_status AS ENUM ('ongoing', 'completed', 'paused');
 
 
 -- ============================================
