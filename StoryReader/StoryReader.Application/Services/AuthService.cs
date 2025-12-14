@@ -1,11 +1,7 @@
-﻿using StoryReader.Application.DTOs;
+﻿using StoryReader.Application.Common;
+using StoryReader.Application.DTOs;
 using StoryReader.Application.Interfaces;
 using StoryReader.Domain.Entities;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace StoryReader.Application.Services
 {
@@ -34,7 +30,9 @@ namespace StoryReader.Application.Services
             var normalizedEmail = request.Email.ToUpperInvariant();
 
             if (await _userRepo.ExistsByEmailAsync(normalizedEmail))
-                throw new ApplicationException("Email already exists");
+                throw AppException.Conflict(
+                   "EMAIL_ALREADY_EXISTS",
+                   "Email already exists");
 
             var passwordHash = _passwordHasher.Hash(request.Password);
 
@@ -71,16 +69,25 @@ namespace StoryReader.Application.Services
             var normalizedEmail = request.Email.ToUpperInvariant();
             var user = await _userRepo.GetByEmailAsync(normalizedEmail);
 
-            if (user == null || !user.IsActive)
-                throw new ApplicationException("Invalid credentials");
+            if (user == null)
+                throw AppException.Unauthorized(
+                    "INVALID_CREDENTIALS",
+                    "Email or password is incorrect");
+
+            if (!user.IsActive)
+                throw AppException.Forbidden(
+                    "USER_INACTIVE",
+                    "User account is inactive");
 
             if (!_passwordHasher.Verify(request.Password, user.PasswordHash))
-                throw new ApplicationException("Invalid credentials");
+                throw AppException.Unauthorized(
+                     "INVALID_CREDENTIALS",
+                     "Email or password is incorrect");
 
             user.LastLoginAt = DateTime.UtcNow;
             await _userRepo.UpdateAsync(user);
 
-            // logout all devices (refresh token rotation)
+            // logout all devices
             await _refreshTokenRepo.RevokeAllByUserAsync(user.Id);
 
             var refreshToken = CreateRefreshToken(user.Id);
@@ -100,13 +107,31 @@ namespace StoryReader.Application.Services
         {
             var storedToken = await _refreshTokenRepo.GetByTokenAsync(request.RefreshToken);
 
-            if (storedToken == null || storedToken.IsExpired || storedToken.IsRevoked)
-                throw new ApplicationException("Invalid refresh token");
+            if (storedToken == null)
+                throw AppException.Unauthorized(
+                    "INVALID_REFRESH_TOKEN",
+                    "Refresh token is invalid");
+
+            if (storedToken.IsExpired)
+                throw AppException.Unauthorized(
+                    "REFRESH_TOKEN_EXPIRED",
+                    "Refresh token has expired");
+
+            if (storedToken.IsRevoked)
+                throw AppException.Unauthorized(
+                    "REFRESH_TOKEN_REVOKED",
+                    "Refresh token has been revoked");
 
             var user = await _userRepo.GetByIdAsync(storedToken.UserId);
+            if (user == null)
+                throw AppException.NotFound(
+                    "USER_NOT_FOUND",
+                    "User not found");
 
-            if (user == null || !user.IsActive)
-                throw new ApplicationException("User not found");
+            if (!user.IsActive)
+                throw AppException.Forbidden(
+                    "USER_INACTIVE",
+                    "User account is inactive");
 
             // revoke old refresh token
             await _refreshTokenRepo.RevokeAsync(storedToken.Id);
@@ -136,5 +161,4 @@ namespace StoryReader.Application.Services
             };
         }
     }
-
 }

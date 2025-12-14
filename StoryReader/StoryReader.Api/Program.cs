@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using StoryReader.Api.Middlewares;
 using StoryReader.Application.Interfaces;
 using StoryReader.Application.Services;
 using StoryReader.Infrastructure.Jwt;
@@ -88,6 +89,9 @@ namespace StoryReader.Api
             }
 
             app.UseHttpsRedirection();
+
+            app.UseMiddleware<ExceptionMiddleware>();
+            app.UseMiddleware<RequestLoggingMiddleware>();
 
             app.UseAuthentication();
             app.UseAuthorization();

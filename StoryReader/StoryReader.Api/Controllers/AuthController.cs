@@ -1,11 +1,12 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
+using StoryReader.Api.Extensions;
 using StoryReader.Application.DTOs;
 using StoryReader.Application.Interfaces;
 using LoginRequest = StoryReader.Application.DTOs.LoginRequest;
 using RegisterRequest = StoryReader.Application.DTOs.RegisterRequest;
-
+using StoryReader.Api.Extensions;
 namespace StoryReader.Api.Controllers
 {
     [ApiController]
@@ -21,29 +22,29 @@ namespace StoryReader.Api.Controllers
 
         // ---------------- REGISTER ----------------
         [HttpPost("register")]
-        public async Task<ActionResult<AuthResultDto>> Register(
+        public async Task<IActionResult> Register(
             [FromBody] RegisterRequest request)
         {
             var result = await _authService.RegisterAsync(request);
-            return Ok(result);
+            return this.OkResponse(result);
         }
 
         // ---------------- LOGIN ----------------
         [HttpPost("login")]
-        public async Task<ActionResult<AuthResultDto>> Login(
+        public async Task<IActionResult> Login(
             [FromBody] LoginRequest request)
         {
             var result = await _authService.LoginAsync(request);
-            return Ok(result);
+            return this.OkResponse(result);
         }
 
         // ---------------- REFRESH TOKEN ----------------
         [HttpPost("refresh")]
-        public async Task<ActionResult<AuthResultDto>> Refresh(
+        public async Task<IActionResult> Refresh(
             [FromBody] RefreshTokenRequest request)
         {
             var result = await _authService.RefreshAsync(request);
-            return Ok(result);
+            return this.OkResponse(result);
         }
     }
 
