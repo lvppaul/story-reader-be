@@ -12,6 +12,9 @@ namespace StoryReader.Application.Interfaces
         Task<AuthResultDto> RegisterAsync(RegisterRequest request);
         Task<AuthResultDto> LoginAsync(LoginRequest request);
         Task<AuthResultDto> RefreshAsync(RefreshTokenRequest request);
+
+        Task LogoutAsync(string refreshToken);
+        Task LogoutAllAsync(Guid userId);
     }
 
 }

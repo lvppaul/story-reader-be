@@ -148,6 +148,25 @@ namespace StoryReader.Application.Services
             };
         }
 
+        // ---------------- LOGOUT (ONE DEVICE) ----------------
+        public async Task LogoutAsync(string refreshToken)
+        {
+            var storedToken = await _refreshTokenRepo.GetByTokenAsync(refreshToken);
+
+            if (storedToken == null)
+                return; // idempotent (logout nhiều lần cũng OK)
+
+            if (!storedToken.IsRevoked)
+                await _refreshTokenRepo.RevokeAsync(storedToken.Id);
+        }
+
+        // ---------------- LOGOUT ALL DEVICES ----------------
+        public async Task LogoutAllAsync(Guid userId)
+        {
+            await _refreshTokenRepo.RevokeAllByUserAsync(userId);
+        }
+
+
         // ---------------- PRIVATE ----------------
         private static RefreshToken CreateRefreshToken(Guid userId)
         {

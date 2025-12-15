@@ -1,12 +1,14 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
 using StoryReader.Api.Extensions;
+using StoryReader.Api.Extensions;
 using StoryReader.Application.DTOs;
 using StoryReader.Application.Interfaces;
+using System.Security.Claims;
 using LoginRequest = StoryReader.Application.DTOs.LoginRequest;
 using RegisterRequest = StoryReader.Application.DTOs.RegisterRequest;
-using StoryReader.Api.Extensions;
 namespace StoryReader.Api.Controllers
 {
     [ApiController]
@@ -45,6 +47,28 @@ namespace StoryReader.Api.Controllers
         {
             var result = await _authService.RefreshAsync(request);
             return this.OkResponse(result);
+        }
+
+        // ---------------- LOGOUT (ONE DEVICE) ----------------
+        [HttpPost("logout")]
+        public async Task<IActionResult> Logout(
+            [FromBody] LogoutRequest request)
+        {
+            await _authService.LogoutAsync(request.RefreshToken);
+            return this.OkResponse(true, "Logged out successfully");
+        }
+
+        // ---------------- LOGOUT ALL DEVICES ----------------
+        [Authorize]
+        [HttpPost("logout-all")]
+        public async Task<IActionResult> LogoutAll()
+        {
+            var userId = Guid.Parse(
+                User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+            await _authService.LogoutAllAsync(userId);
+
+            return this.OkResponse(true, "Logged out from all devices");
         }
     }
 
