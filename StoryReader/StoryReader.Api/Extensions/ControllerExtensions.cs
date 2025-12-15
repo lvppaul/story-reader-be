@@ -12,5 +12,12 @@ namespace StoryReader.Api.Extensions
         {
             return controller.Ok(ApiResponse<T>.Ok(data, message));
         }
+
+        public static IActionResult OkMessage(
+           this ControllerBase controller,
+           string message)
+        {
+            return controller.Ok(ApiResponse<object>.Ok(null, message));
+        }
     }
 }

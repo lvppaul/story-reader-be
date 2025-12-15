@@ -33,7 +33,7 @@ namespace StoryReader.Api.Middlewares
                     ex.StatusCode,
                     ex.Code,
                     ex.Message,
-                    null);
+                    "Bị lỗi rồi");
             }
 
             catch (Exception ex)

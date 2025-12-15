@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 using StoryReader.Api.Middlewares;
 using StoryReader.Application.Interfaces;
 using StoryReader.Application.Services;
@@ -23,18 +24,57 @@ namespace StoryReader.Api
             builder.Services.AddControllers();
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
-            builder.Services.AddSwaggerGen();
+
+            // override lại swagger để có chỗ nhập token
+            builder.Services.AddSwaggerGen(c =>
+            {
+                c.SwaggerDoc("v1", new()
+                {
+                    Title = "StoryReader API",
+                    Version = "v1"
+                });
+
+                //  JWT config
+                c.AddSecurityDefinition("Bearer", new()
+                {
+                    Name = "Authorization",
+                    Type = SecuritySchemeType.Http,
+                    Scheme = "Bearer",
+                    BearerFormat = "JWT",
+                    In = ParameterLocation.Header,
+                    Description = "Enter JWT token like: Bearer {your_token}"
+                });
+
+                c.AddSecurityRequirement(new OpenApiSecurityRequirement
+                {
+                    {
+                        new OpenApiSecurityScheme
+                        {
+                            Reference = new OpenApiReference
+                            {
+                                Type = ReferenceType.SecurityScheme,
+                                Id = "Bearer"
+                            }
+                        },
+                        Array.Empty<string>()
+                    }
+                });
+            });
+
 
             // DI - Repositories
             builder.Services.AddScoped<IUserRepository, UserRepository>();
             builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+            builder.Services.AddScoped<IStoryRepository, StoryRepository>();
 
             // DI - Infrastructure Services
             builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
             builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
+          
 
             // DI - Application Services
             builder.Services.AddScoped<IAuthService, AuthService>();
+            builder.Services.AddScoped<IStoryService, StoryService>();
 
             // Bind JwtOptions + DI
             builder.Services.Configure<JwtOptions>( builder.Configuration.GetSection("Jwt"));
