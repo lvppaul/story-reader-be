@@ -25,7 +25,7 @@ namespace StoryReader.Application.Services
         }
 
         // ---------------- REGISTER ----------------
-        public async Task<AuthResultDto> RegisterAsync(RegisterRequest request)
+        public async Task<AuthInternalResult> RegisterAsync(RegisterRequest request)
         {
             var normalizedEmail = request.Email.ToUpperInvariant();
 
@@ -56,7 +56,7 @@ namespace StoryReader.Application.Services
 
             var accessToken = _jwtTokenService.GenerateAccessToken(user);
 
-            return new AuthResultDto
+            return new AuthInternalResult
             {
                 AccessToken = accessToken,
                 RefreshToken = refreshToken.Token
@@ -64,7 +64,7 @@ namespace StoryReader.Application.Services
         }
 
         // ---------------- LOGIN ----------------
-        public async Task<AuthResultDto> LoginAsync(LoginRequest request)
+        public async Task<AuthInternalResult> LoginAsync(LoginRequest request)
         {
             var normalizedEmail = request.Email.ToUpperInvariant();
             var user = await _userRepo.GetByEmailAsync(normalizedEmail);
@@ -95,7 +95,7 @@ namespace StoryReader.Application.Services
 
             var accessToken = _jwtTokenService.GenerateAccessToken(user);
 
-            return new AuthResultDto
+            return new AuthInternalResult
             {
                 AccessToken = accessToken,
                 RefreshToken = refreshToken.Token
@@ -103,9 +103,9 @@ namespace StoryReader.Application.Services
         }
 
         // ---------------- REFRESH TOKEN ----------------
-        public async Task<AuthResultDto> RefreshAsync(RefreshTokenRequest request)
+        public async Task<AuthInternalResult> RefreshAsync( string refreshToken)
         {
-            var storedToken = await _refreshTokenRepo.GetByTokenAsync(request.RefreshToken);
+            var storedToken = await _refreshTokenRepo.GetByTokenAsync(refreshToken);
 
             if (storedToken == null)
                 throw AppException.Unauthorized(
@@ -141,7 +141,7 @@ namespace StoryReader.Application.Services
 
             var accessToken = _jwtTokenService.GenerateAccessToken(user);
 
-            return new AuthResultDto
+            return new AuthInternalResult
             {
                 AccessToken = accessToken,
                 RefreshToken = newRefreshToken.Token

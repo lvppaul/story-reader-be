@@ -9,9 +9,9 @@ namespace StoryReader.Application.Interfaces
 {
     public interface IAuthService
     {
-        Task<AuthResultDto> RegisterAsync(RegisterRequest request);
-        Task<AuthResultDto> LoginAsync(LoginRequest request);
-        Task<AuthResultDto> RefreshAsync(RefreshTokenRequest request);
+        Task<AuthInternalResult> RegisterAsync(RegisterRequest request);
+        Task<AuthInternalResult> LoginAsync(LoginRequest request);
+        Task<AuthInternalResult> RefreshAsync(string refreshToken);
 
         Task LogoutAsync(string refreshToken);
         Task LogoutAllAsync(Guid userId);

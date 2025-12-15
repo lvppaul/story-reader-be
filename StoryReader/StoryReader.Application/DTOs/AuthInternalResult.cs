@@ -6,10 +6,9 @@ using System.Threading.Tasks;
 
 namespace StoryReader.Application.DTOs
 {
-    public class AuthResultDto
+    public class AuthInternalResult
     {
         public string AccessToken { get; set; } = default!;
-       
+        public string RefreshToken { get; set; } = default!;
     }
-
 }
