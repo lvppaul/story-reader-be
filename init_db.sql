@@ -1,31 +1,53 @@
 -- ============================================
--- EXTENSIONS
+-- USERS TABLE (EF CORE FRIENDLY)
 -- ============================================
+
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+DROP TABLE IF EXISTS users CASCADE;
 
--- ============================================
--- USERS
--- ============================================
 CREATE TABLE users (
   id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   email varchar(255) NOT NULL UNIQUE,
   normalized_email varchar(255) NOT NULL,
   password_hash varchar(512) NOT NULL,
   display_name varchar(100),
-  is_email_confirmed boolean DEFAULT false,
-  is_active boolean DEFAULT true,
-  created_at timestamptz DEFAULT now(),
-  updated_at timestamptz DEFAULT now(),
-  last_login_at timestamptz
+  role varchar(20) NOT NULL DEFAULT 'user',
+  is_email_confirmed boolean NOT NULL DEFAULT false,
+  is_active boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  last_login_at timestamptz,
+  CONSTRAINT chk_users_role
+    CHECK (role IN ('user', 'admin'))
 );
 
--- Index để tăng tốc login & check email tồn tại
-CREATE UNIQUE INDEX uq_users_normalized_email
+-- INDEXES
+CREATE UNIQUE INDEX IF NOT EXISTS uq_users_normalized_email
 ON users(normalized_email);
 
+CREATE INDEX IF NOT EXISTS idx_users_role
+ON users(role);
 
+CREATE INDEX IF NOT EXISTS idx_users_active
+ON users(is_active);
 
+-- FUNCTION
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- TRIGGER
+DROP TRIGGER IF EXISTS update_users_updated_at ON users;
+
+CREATE TRIGGER update_users_updated_at
+BEFORE UPDATE ON users
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at_column();
 -- ============================================
 -- REFRESH TOKENS
 -- ============================================
