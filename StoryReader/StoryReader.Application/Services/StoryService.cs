@@ -1,4 +1,5 @@
-﻿using StoryReader.Application.Common;
+﻿using Microsoft.Extensions.Logging;
+using StoryReader.Application.Common;
 using StoryReader.Application.DTOs;
 using StoryReader.Application.Interfaces;
 using StoryReader.Domain.Entities;
@@ -13,21 +14,21 @@ namespace StoryReader.Application.Services
     public class StoryService : IStoryService
     {
         private readonly IStoryRepository _repo;
+        private readonly IRedisStoryCache _cache;  // Depend vào interface (Application)
+        private readonly ILogger<StoryService> _logger;
 
-        public StoryService(IStoryRepository repo)
+        public StoryService(IStoryRepository repo, IRedisStoryCache cache, ILogger<StoryService> logger)
         {
             _repo = repo;
+            _cache = cache;
+            _logger = logger;
         }
 
-        // ---------- CREATE ----------
         public async Task<StoryDto> CreateAsync(Guid authorId, CreateStoryRequest request)
         {
             var slug = GenerateSlug(request.Title);
-
             if (await _repo.ExistsBySlugAsync(slug))
-                throw AppException.Conflict(
-                    "STORY_EXISTS",
-                    "Story with same title already exists");
+                throw AppException.Conflict("STORY_EXISTS", "Story with same title already exists");
 
             var story = new Story
             {
@@ -43,48 +44,73 @@ namespace StoryReader.Application.Services
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
-
             await _repo.AddAsync(story);
+
+            // Invalidate qua interface (không biết Redis)
+            await _cache.InvalidateAllAsync();
 
             return ToDto(story);
         }
 
-        // ---------- READ ----------
         public async Task<PagedResult<StoryDto>> GetAllAsync(int page, int pageSize)
         {
             if (page <= 0 || pageSize <= 0)
-                throw AppException.BadRequest(
-                    "INVALID_PAGING",
-                    "Page and pageSize must be greater than zero");
+                throw AppException.BadRequest("INVALID_PAGING", "Page and pageSize must be greater than zero");
 
+            // Check cache qua interface
+            var cachedResult = await _cache.GetAllCachedAsync(page, pageSize);
+            if (cachedResult != null)
+                return cachedResult;
+
+            // Miss: Load DB
+            _logger.LogInformation("Loading stories from DB (cache miss)");
             var stories = await _repo.GetAllAsync(page, pageSize);
             var total = await _repo.CountAsync();
-
-            return new PagedResult<StoryDto>
+            var result = new PagedResult<StoryDto>
             {
                 Items = stories.Select(ToDto).ToList(),
                 Page = page,
                 PageSize = pageSize,
                 Total = total
             };
+
+            // Set cache qua interface
+            await _cache.SetAllCachedAsync(page, pageSize, result, TimeSpan.FromHours(1));
+
+            return result;
         }
 
         public async Task<StoryDto> GetBySlugAsync(string slug)
         {
+            // Check cache qua interface
+            var cachedDto = await _cache.GetBySlugCachedAsync(slug);
+            if (cachedDto != null)
+            {
+                // Increment views từ DB (dynamic)
+                await _repo.IncrementViewsAsync(cachedDto.Id);  // Cần map Id từ DTO
+                cachedDto.Views += 1;  // Update local
+                return cachedDto;
+            }
+
+            // Miss: Load DB
+            _logger.LogInformation("Loading story from DB (cache miss)");
             var story = await _repo.GetBySlugAsync(slug);
-
             if (story == null)
-                throw AppException.NotFound(
-                    "STORY_NOT_FOUND",
-                    "Story not found");
+                throw AppException.NotFound("STORY_NOT_FOUND", "Story not found");
 
+            // Increment views
             await _repo.IncrementViewsAsync(story.Id);
             story.Views += 1;
 
-            return ToDto(story);
+            var dto = ToDto(story);
+
+            // Set cache qua interface
+            await _cache.SetBySlugCachedAsync(slug, dto, TimeSpan.FromMinutes(30));
+
+            return dto;
         }
 
-        // ---------- HELPERS ----------
+        // Helpers (giữ nguyên)
         private static StoryDto ToDto(Story story) => new()
         {
             Id = story.Id,
@@ -94,7 +120,6 @@ namespace StoryReader.Application.Services
             Views = story.Views
         };
 
-        private static string GenerateSlug(string title)
-            => title.Trim().ToLower().Replace(" ", "-");
+        private static string GenerateSlug(string title) => title.Trim().ToLower().Replace(" ", "-");
     }
 }

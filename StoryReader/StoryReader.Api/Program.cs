@@ -2,11 +2,14 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+
 using StoryReader.Api.Middlewares;
+using StoryReader.Application;
 using StoryReader.Application.Interfaces;
 using StoryReader.Application.Services;
+using StoryReader.Infrastructure;
 using StoryReader.Infrastructure.Jwt;
-using StoryReader.Infrastructure.Password;
+using StoryReader.Persistence;
 using StoryReader.Persistence.Context;
 using StoryReader.Persistence.Repositories;
 using System.Text;
@@ -25,7 +28,7 @@ namespace StoryReader.Api
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
 
-            // override lại swagger để có chỗ nhập token
+            // override lại swagger để có chỗ nhập token
             builder.Services.AddSwaggerGen(c =>
             {
                 c.SwaggerDoc("v1", new()
@@ -61,20 +64,11 @@ namespace StoryReader.Api
                 });
             });
 
+            // DI
+            builder.Services.AddInfrastructure(builder.Configuration);
+            builder.Services.AddPersistence(builder.Configuration);
+            builder.Services.AddApplication(builder.Configuration);
 
-            // DI - Repositories
-            builder.Services.AddScoped<IUserRepository, UserRepository>();
-            builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
-            builder.Services.AddScoped<IStoryRepository, StoryRepository>();
-
-            // DI - Infrastructure Services
-            builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
-            builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
-          
-
-            // DI - Application Services
-            builder.Services.AddScoped<IAuthService, AuthService>();
-            builder.Services.AddScoped<IStoryService, StoryService>();
 
             // Bind JwtOptions + DI
             builder.Services.Configure<JwtOptions>( builder.Configuration.GetSection("Jwt"));
@@ -106,14 +100,13 @@ namespace StoryReader.Api
                 };
             });
 
-            builder.Services.AddAuthorization();
-
-            // connect db
-            builder.Services.AddDbContext<AppDbContext>(options =>
+            builder.Services.AddAuthorization(options =>
             {
-                options.UseNpgsql(
-                    builder.Configuration.GetConnectionString("Postgres")
-                );
+                options.AddPolicy("AdminOnly", policy =>
+                    policy.RequireRole("admin"));
+
+                options.AddPolicy("UserOrAdmin", policy =>
+                    policy.RequireRole("user", "admin"));
             });
 
 

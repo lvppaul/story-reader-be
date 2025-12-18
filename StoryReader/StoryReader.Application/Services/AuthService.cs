@@ -11,17 +11,20 @@ namespace StoryReader.Application.Services
         private readonly IRefreshTokenRepository _refreshTokenRepo;
         private readonly IJwtTokenService _jwtTokenService;
         private readonly IPasswordHasher _passwordHasher;
+        private readonly IAuthTokenStore _tokenStore;
 
         public AuthService(
             IUserRepository userRepo,
             IRefreshTokenRepository refreshTokenRepo,
             IJwtTokenService jwtTokenService,
-            IPasswordHasher passwordHasher)
+            IPasswordHasher passwordHasher,
+            IAuthTokenStore tokenStore)
         {
             _userRepo = userRepo;
             _refreshTokenRepo = refreshTokenRepo;
             _jwtTokenService = jwtTokenService;
             _passwordHasher = passwordHasher;
+            _tokenStore = tokenStore;
         }
 
         // ---------------- REGISTER ----------------
@@ -43,6 +46,7 @@ namespace StoryReader.Application.Services
                 NormalizedEmail = normalizedEmail,
                 PasswordHash = passwordHash,
                 DisplayName = request.DisplayName,
+                Role = "user",
                 IsActive = true,
                 IsEmailConfirmed = false,
                 CreatedAt = DateTime.UtcNow,
@@ -52,7 +56,15 @@ namespace StoryReader.Application.Services
             await _userRepo.AddAsync(user);
 
             var refreshToken = CreateRefreshToken(user.Id);
+
+            // DB (optional)
             await _refreshTokenRepo.AddAsync(refreshToken);
+
+            //  Redis là source chính
+            await _tokenStore.SaveAsync(
+                refreshToken.Token,
+                user.Id,
+                TimeSpan.FromDays(7));
 
             var accessToken = _jwtTokenService.GenerateAccessToken(user);
 
@@ -88,10 +100,20 @@ namespace StoryReader.Application.Services
             await _userRepo.UpdateAsync(user);
 
             // logout all devices
-            await _refreshTokenRepo.RevokeAllByUserAsync(user.Id);
+            //  DB revoke
+          //  await _refreshTokenRepo.RevokeAllByUserAsync(user.Id);
+
+            //  Redis revoke all
+         //   await _tokenStore.RevokeAllAsync(user.Id);
 
             var refreshToken = CreateRefreshToken(user.Id);
             await _refreshTokenRepo.AddAsync(refreshToken);
+
+            // Redis save
+            await _tokenStore.SaveAsync(
+           refreshToken.Token,
+           user.Id,
+           TimeSpan.FromDays(7));
 
             var accessToken = _jwtTokenService.GenerateAccessToken(user);
 
@@ -103,41 +125,48 @@ namespace StoryReader.Application.Services
         }
 
         // ---------------- REFRESH TOKEN ----------------
-        public async Task<AuthInternalResult> RefreshAsync( string refreshToken)
+        public async Task<AuthInternalResult> RefreshAsync(string refreshToken)
         {
-            var storedToken = await _refreshTokenRepo.GetByTokenAsync(refreshToken);
-
-            if (storedToken == null)
+            //  Reuse attack
+            if (await _tokenStore.IsBlacklistedAsync(refreshToken))
+                throw AppException.Unauthorized(
+                    "REFRESH_TOKEN_REUSE",
+                    "Refresh token has been reused");
+             
+            //  Token hợp lệ?
+            var userId = await _tokenStore.GetUserIdAsync(refreshToken);
+            if (userId == null)
                 throw AppException.Unauthorized(
                     "INVALID_REFRESH_TOKEN",
                     "Refresh token is invalid");
 
-            if (storedToken.IsExpired)
-                throw AppException.Unauthorized(
-                    "REFRESH_TOKEN_EXPIRED",
-                    "Refresh token has expired");
-
-            if (storedToken.IsRevoked)
-                throw AppException.Unauthorized(
-                    "REFRESH_TOKEN_REVOKED",
-                    "Refresh token has been revoked");
-
-            var user = await _userRepo.GetByIdAsync(storedToken.UserId);
-            if (user == null)
-                throw AppException.NotFound(
-                    "USER_NOT_FOUND",
-                    "User not found");
-
-            if (!user.IsActive)
+            var user = await _userRepo.GetByIdAsync(userId.Value);
+            if (user == null || !user.IsActive)
                 throw AppException.Forbidden(
                     "USER_INACTIVE",
                     "User account is inactive");
 
-            // revoke old refresh token
-            await _refreshTokenRepo.RevokeAsync(storedToken.Id);
+            //  Rotate token
+            await _tokenStore.BlacklistAsync(
+                refreshToken,
+                TimeSpan.FromDays(7));
+
+            await _tokenStore.RevokeAsync(refreshToken);
+
+            // DB revoke (optional)
+            var dbToken = await _refreshTokenRepo.GetByTokenAsync(refreshToken);
+            if (dbToken != null)
+                await _refreshTokenRepo.RevokeAsync(dbToken.Id);
 
             var newRefreshToken = CreateRefreshToken(user.Id);
+
             await _refreshTokenRepo.AddAsync(newRefreshToken);
+
+            //  Redis là source chính
+            await _tokenStore.SaveAsync(
+                newRefreshToken.Token,
+                user.Id,
+                TimeSpan.FromDays(7));
 
             var accessToken = _jwtTokenService.GenerateAccessToken(user);
 
@@ -147,22 +176,26 @@ namespace StoryReader.Application.Services
                 RefreshToken = newRefreshToken.Token
             };
         }
+        
 
         // ---------------- LOGOUT (ONE DEVICE) ----------------
         public async Task LogoutAsync(string refreshToken)
         {
-            var storedToken = await _refreshTokenRepo.GetByTokenAsync(refreshToken);
+            await _tokenStore.BlacklistAsync(
+                refreshToken,
+                TimeSpan.FromDays(7));
 
-            if (storedToken == null)
-                return; // idempotent (logout nhiều lần cũng OK)
+            await _tokenStore.RevokeAsync(refreshToken);
 
-            if (!storedToken.IsRevoked)
-                await _refreshTokenRepo.RevokeAsync(storedToken.Id);
+            var dbToken = await _refreshTokenRepo.GetByTokenAsync(refreshToken);
+            if (dbToken != null && !dbToken.IsRevoked)
+                await _refreshTokenRepo.RevokeAsync(dbToken.Id);
         }
 
         // ---------------- LOGOUT ALL DEVICES ----------------
         public async Task LogoutAllAsync(Guid userId)
         {
+            await _tokenStore.RevokeAllAsync(userId);
             await _refreshTokenRepo.RevokeAllByUserAsync(userId);
         }
 

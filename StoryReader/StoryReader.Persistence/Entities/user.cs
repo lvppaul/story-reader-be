@@ -15,13 +15,15 @@ public partial class user
 
     public string? display_name { get; set; }
 
-    public bool? is_email_confirmed { get; set; }
+    public string role { get; set; } = null!;
 
-    public bool? is_active { get; set; }
+    public bool is_email_confirmed { get; set; }
 
-    public DateTime? created_at { get; set; }
+    public bool is_active { get; set; }
 
-    public DateTime? updated_at { get; set; }
+    public DateTime created_at { get; set; }
+
+    public DateTime updated_at { get; set; }
 
     public DateTime? last_login_at { get; set; }
 

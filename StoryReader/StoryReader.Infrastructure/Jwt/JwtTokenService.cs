@@ -3,12 +3,8 @@ using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using StoryReader.Application.Interfaces;
 using StoryReader.Domain.Entities;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Security.Claims;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace StoryReader.Infrastructure.Jwt
 {
@@ -27,7 +23,8 @@ namespace StoryReader.Infrastructure.Jwt
             {
                 new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
                 new(JwtRegisteredClaimNames.Email, user.Email ?? ""),
-                new("displayName", user.DisplayName ?? "")
+                new("displayName", user.DisplayName ?? ""),
+                new(ClaimTypes.Role, user.Role)
             };
 
             var key = new SymmetricSecurityKey(
@@ -39,7 +36,6 @@ namespace StoryReader.Infrastructure.Jwt
                 SecurityAlgorithms.HmacSha256
             );
 
-            // JWT phiên bản mới – JsonWebTokenHandler
             var handler = new JsonWebTokenHandler();
 
             return handler.CreateToken(new SecurityTokenDescriptor

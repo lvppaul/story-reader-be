@@ -252,6 +252,8 @@ public partial class AppDbContext : DbContext
         {
             entity.HasKey(e => e.id).HasName("users_pkey");
 
+            entity.HasIndex(e => e.is_active, "idx_users_active");
+
             entity.HasIndex(e => e.normalized_email, "uq_users_normalized_email").IsUnique();
 
             entity.HasIndex(e => e.email, "users_email_key").IsUnique();
@@ -264,6 +266,9 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.is_email_confirmed).HasDefaultValue(false);
             entity.Property(e => e.normalized_email).HasMaxLength(255);
             entity.Property(e => e.password_hash).HasMaxLength(512);
+            entity.Property(e => e.role)
+                .HasMaxLength(20)
+                .HasDefaultValueSql("'user'::character varying");
             entity.Property(e => e.updated_at).HasDefaultValueSql("now()");
         });
 

@@ -4,11 +4,11 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace StoryReader.Application.DTOs
+namespace StoryReader.Persistence.Enums
 {
-    public class AuthResultDto
+    public enum UserRole
     {
-        public string AccessToken { get; set; } = default!;
+        user,
+        admin
     }
-
 }

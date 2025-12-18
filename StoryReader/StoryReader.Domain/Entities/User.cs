@@ -15,6 +15,8 @@ namespace StoryReader.Domain.Entities
         public string PasswordHash { get; set; } = default!;
         public string? DisplayName { get; set; }
 
+        public string Role { get; set; } = "user";
+
         public bool IsEmailConfirmed { get; set; }
         public bool IsActive { get; set; }
 
@@ -22,6 +24,4 @@ namespace StoryReader.Domain.Entities
         public DateTime UpdatedAt { get; set; }
         public DateTime? LastLoginAt { get; set; }
     }
-
-
 }
